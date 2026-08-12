@@ -17,8 +17,7 @@
   button:hover { background: #1d4ed8; }
   button:disabled { background: #9ca3af; cursor: not-allowed; }
   .acts { display: flex; gap: 12px; margin-top: 10px; align-items: center; }
-  .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #4b5563; cursor: pointer; user-select: none; }
-  .chk input { margin: 0; cursor: pointer; }
+  .url { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #4b5563; word-break: break-all; background: #f9fafb; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 10px; min-height: 16px; }
   .err { color: #dc2626; font-size: 12px; margin-top: 6px; min-height: 16px; }
 </style>
 </head>
@@ -41,23 +40,20 @@
 </div>
 
 <div class="box">
-  <div class="lbl">API 返回</div>
-  <textarea id="out" rows="3" readonly placeholder=" "></textarea>
+  <div class="lbl">访问 API</div>
+  <div id="url" class="url"> </div>
   <div class="acts">
-    <button id="go">查询</button>
-    <label class="chk"><input type="checkbox" id="raw"> 显示原始 JSON</label>
+    <button id="open" disabled>打开链接</button>
   </div>
-  <div id="eOut" class="err"></div>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
 const inp = $('in'), phone = $('phone'), cp = $('cp'),
-      out = $('out'), go = $('go'), raw = $('raw'),
-      eIn = $('eIn'), eOut = $('eOut');
+      open = $('open'), url = $('url'),
+      eIn = $('eIn');
 
 let lastUrl = '';
-let lastJson = null;
 
 function parse(t) {
   const i = t.indexOf('----');
@@ -74,21 +70,23 @@ function fmtPhone(p) {
   return m ? `${m[1].slice(0,3)} ${m[1].slice(3,6)} ${m[1].slice(6,10)}` : null;
 }
 
-function renderOut() {
-  if (!lastJson) { out.value = ''; return; }
-  out.value = raw.checked
-    ? JSON.stringify(lastJson, null, 2)
-    : ((lastJson.data && lastJson.data.code) || '(空 code)');
-}
-
 inp.addEventListener('input', () => {
-  eIn.textContent = ''; eOut.textContent = '';
+  eIn.textContent = '';
   const p = parse(inp.value.trim());
-  if (!p) { phone.value = ''; cp.disabled = true; if (inp.value.trim()) eIn.textContent = '格式：+1XXXXXXXXXX----URL'; return; }
+  if (!p) {
+    phone.value = ''; cp.disabled = true; open.disabled = true; url.textContent = ' ';
+    if (inp.value.trim()) eIn.textContent = '格式：+1XXXXXXXXXX----URL';
+    return;
+  }
   const f = fmtPhone(p.phone);
-  if (!f) { phone.value = ''; cp.disabled = true; eIn.textContent = '手机号格式错'; return; }
+  if (!f) {
+    phone.value = ''; cp.disabled = true; open.disabled = true; url.textContent = ' ';
+    eIn.textContent = '手机号格式错';
+    return;
+  }
   phone.value = f; cp.disabled = false;
-  if (lastJson) { lastJson = null; lastUrl = ''; out.value = ''; go.textContent = '查询'; go.disabled = false; }
+  if (p.url !== lastUrl) { lastUrl = p.url; url.textContent = p.url; }
+  open.disabled = false;
 });
 
 cp.addEventListener('click', async () => {
@@ -98,30 +96,9 @@ cp.addEventListener('click', async () => {
   } catch (e) { eIn.textContent = '复制失败：' + e.message; }
 });
 
-async function query() {
-  eOut.textContent = '';
-  const p = parse(inp.value.trim());
-  if (!p) { eOut.textContent = '格式错误'; go.textContent = '查询'; go.disabled = false; return; }
-  go.disabled = true; go.textContent = '请求中...';
-  try {
-    const r = await fetch(p.url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
-    if (j.code !== undefined && j.code !== 0) throw new Error('API ' + j.code + ' ' + (j.msg||''));
-    lastUrl = p.url;
-    lastJson = j;
-    renderOut();
-    go.textContent = '刷新';
-    go.disabled = false;
-  } catch (e) {
-    eOut.textContent = '失败：' + e.message;
-    go.textContent = '查询';
-    go.disabled = false;
-  }
-}
-
-go.addEventListener('click', query);
-raw.addEventListener('change', renderOut);
+open.addEventListener('click', () => {
+  if (lastUrl) window.open(lastUrl, '_blank');
+});
 </script>
 </body>
 </html>
